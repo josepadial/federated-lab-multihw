@@ -1,6 +1,5 @@
 import platform
 
-
 def get_windows_cpu_name():
     import subprocess
     # Try WMIC
@@ -26,7 +25,6 @@ def get_windows_cpu_name():
         pass
     return None
 
-
 def get_cpu_name():
     import platform
     try:
@@ -43,7 +41,6 @@ def get_cpu_name():
     except Exception:
         pass
     return platform.processor() or platform.uname().processor or "Generic CPU"
-
 
 def get_available_devices(backend='pytorch'):
     devices = []
@@ -62,11 +59,10 @@ def get_available_devices(backend='pytorch'):
                 dev_type = get_device_type_openvino(dev)
                 devices.append({'name': dev, 'type': dev_type, 'id': None})
         except ImportError:
-            print("OpenVINO no está instalado.")
+            print("OpenVINO is not installed.")
     elif backend == 'onnx':
         devices.append({'name': 'CPU', 'type': 'CPU', 'id': None})
     return devices
-
 
 def get_device_type_openvino(dev_name):
     if 'CPU' in dev_name:
@@ -79,7 +75,6 @@ def get_device_type_openvino(dev_name):
         return 'VPU'
     return 'OTHER'
 
-
 def print_available_devices(backend='pytorch'):
     devices = get_available_devices(backend)
     print(f"Available devices for backend '{backend}':")
@@ -87,25 +82,22 @@ def print_available_devices(backend='pytorch'):
         id_str = f" (id {d['id']})" if d['id'] is not None else ""
         print(f"- {d['name']} [{d['type']}{id_str}]")
 
-
 def select_main_device(devices):
-    # Prioridad: GPU > NPU > VPU > CPU > otro
+    # Priority: GPU > NPU > VPU > CPU > other
     for dev_type in ['GPU', 'NPU', 'VPU', 'CPU']:
         for d in devices:
             if d['type'] == dev_type:
                 return get_device_object(d)
-    # Si no hay ninguno de los anteriores, devolver el primero
+    # If none of the above, return the first one
     d = devices[0]
     return get_device_object(d)
 
-
 def get_device_object(d):
-    # Devuelve el objeto device adecuado según el tipo
+    # Returns the appropriate device object according to the type
     if d['type'] == 'GPU':
         try:
             import torch
-            return torch.device(f"cuda:{d['id']}") if d['id'] is not None else torch.device('cuda'), d['name'], d[
-                'type'], d['id']
+            return torch.device(f"cuda:{d['id']}") if d['id'] is not None else torch.device('cuda'), d['name'], d['type'], d['id']
         except ImportError:
             pass
     if d['type'] == 'CPU':
@@ -114,9 +106,8 @@ def get_device_object(d):
             return torch.device('cpu'), d['name'], d['type'], d['id']
         except ImportError:
             pass
-    # Para NPU, VPU u otros, solo devolvemos el nombre
+    # For NPU, VPU or others, just return the name
     return d['name'], d['name'], d['type'], d['id']
-
 
 def get_eval_devices(devices):
     eval_devices = []
@@ -137,7 +128,6 @@ def get_eval_devices(devices):
             eval_devices.append(d['name'])
     return list({str(dev): dev for dev in eval_devices}.values())
 
-
 def _get_fullname_from_torch_device(dev, devices):
     if dev.type == 'cuda':
         dev_index = getattr(dev, 'index', None)
@@ -153,13 +143,11 @@ def _get_fullname_from_torch_device(dev, devices):
                 return get_cpu_name()
     return None
 
-
 def _get_fullname_from_str_device(dev, devices):
     for d in devices:
         if isinstance(d, dict) and d.get('name') == dev:
             return d.get('name')
     return None
-
 
 def _get_fallback_fullname(dev):
     if hasattr(dev, 'type'):
@@ -177,11 +165,10 @@ def _get_fallback_fullname(dev):
     except Exception:
         return platform.processor() or platform.uname().processor or 'CPU'
 
-
 def get_device_fullname(dev, devices=None):
     """
-    Devuelve el nombre comercial real del dispositivo (CPU, GPU, NPU, etc) usando la lista de dispositivos detectados.
-    Utiliza la lógica de get_cpu_name para CPUs en Windows.
+    Returns the real commercial name of the device (CPU, GPU, NPU, etc) using the detected devices list.
+    Uses get_cpu_name logic for CPUs in Windows.
     """
     if devices is not None:
         if hasattr(dev, 'type'):
@@ -193,14 +180,3 @@ def get_device_fullname(dev, devices=None):
             if name:
                 return name
     return _get_fallback_fullname(dev)
-
-
-from openvino import Core
-
-
-def get_available_openvino_devices():
-    """
-    Devuelve una lista de dispositivos OpenVINO disponibles (por ejemplo: ['CPU', 'GPU', 'NPU']).
-    """
-    core = Core()
-    return core.available_devices

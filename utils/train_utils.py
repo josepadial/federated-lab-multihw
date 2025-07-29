@@ -1,8 +1,8 @@
 """
 train_utils.py
 
-Funciones generales para entrenamiento y evaluación de modelos PyTorch
-para proyectos de deep learning en edge/federated learning.
+General functions for training and evaluating PyTorch models
+for deep learning projects in edge/federated learning.
 """
 
 import time
@@ -26,20 +26,20 @@ def train_model(
         verbose: bool = True
 ) -> Dict[str, List[Any]]:
     """
-    Entrena un modelo PyTorch durante un número configurable de epochs.
+    Trains a PyTorch model for a configurable number of epochs.
 
     Args:
-        model (nn.Module): Modelo a entrenar.
-        optimizer (torch.optim.Optimizer): Optimizador.
-        train_loader (DataLoader): DataLoader de entrenamiento.
-        device (torch.device): Dispositivo ('cpu' o 'cuda').
-        criterion (nn.Module, opcional): Función de pérdida. Si None, usa CrossEntropyLoss.
-        num_epochs (int): Número de epochs de entrenamiento.
-        early_stopping_patience (int, opcional): Número de epochs sin mejora para early stopping.
-        verbose (bool): Si imprimir logs de progreso.
+        model (nn.Module): Model to train.
+        optimizer (torch.optim.Optimizer): Optimizer.
+        train_loader (DataLoader): Training DataLoader.
+        device (torch.device): Device ('cpu' or 'cuda').
+        criterion (nn.Module, optional): Loss function. If None, uses CrossEntropyLoss.
+        num_epochs (int): Number of training epochs.
+        early_stopping_patience (int, optional): Number of epochs without improvement for early stopping.
+        verbose (bool): Whether to print progress logs.
 
     Returns:
-        Dict[str, List[Any]]: Historial de métricas por epoch (loss, accuracy, tiempos, etc).
+        Dict[str, List[Any]]: History of metrics per epoch (loss, accuracy, times, etc).
     """
     if criterion is None:
         criterion = nn.CrossEntropyLoss()
@@ -105,18 +105,18 @@ def evaluate_model(
         verbose: bool = True
 ) -> Dict[str, Any]:
     """
-    Evalúa un modelo PyTorch sobre un DataLoader de validación o test.
+    Evaluates a PyTorch model on a validation or test DataLoader.
 
     Args:
-        model (nn.Module): Modelo a evaluar.
-        data_loader (DataLoader): DataLoader de validación o test.
-        device (torch.device): Dispositivo ('cpu' o 'cuda').
-        criterion (nn.Module, opcional): Función de pérdida. Si None, usa CrossEntropyLoss.
-        return_confusion_matrix (bool): Si devolver matriz de confusión.
-        verbose (bool): Si imprimir logs de progreso.
+        model (nn.Module): Model to evaluate.
+        data_loader (DataLoader): Validation or test DataLoader.
+        device (torch.device): Device ('cpu' or 'cuda').
+        criterion (nn.Module, optional): Loss function. If None, uses CrossEntropyLoss.
+        return_confusion_matrix (bool): Whether to return the confusion matrix.
+        verbose (bool): Whether to print progress logs.
 
     Returns:
-        Dict[str, Any]: Diccionario con accuracy, pérdida, matriz de confusión (opcional), tiempos, etc.
+        Dict[str, Any]: Dictionary with accuracy, loss, confusion matrix (optional), times, etc.
     """
     if criterion is None:
         criterion = nn.CrossEntropyLoss()

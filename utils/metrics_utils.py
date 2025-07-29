@@ -1,7 +1,7 @@
 """
 metrics_utils.py
 
-Funciones para calcular y mostrar métricas de evaluación avanzadas en proyectos de deep learning.
+Functions to compute and display advanced evaluation metrics in deep learning projects.
 """
 
 from typing import List, Optional, Dict, Any, Union
@@ -19,15 +19,15 @@ def compute_confusion_matrix(
         labels: Optional[List[str]] = None
 ) -> np.ndarray:
     """
-    Calcula la matriz de confusión a partir de etiquetas reales y predichas.
+    Computes the confusion matrix from true and predicted labels.
 
     Args:
-        y_true (list o np.ndarray): Etiquetas reales.
-        y_pred (list o np.ndarray): Etiquetas predichas.
-        labels (list, opcional): Nombres de las clases.
+        y_true (list or np.ndarray): True labels.
+        y_pred (list or np.ndarray): Predicted labels.
+        labels (list, optional): Class names.
 
     Returns:
-        np.ndarray: Matriz de confusión.
+        np.ndarray: Confusion matrix.
     """
     return confusion_matrix(y_true, y_pred, labels=range(len(labels)) if labels else None)
 
@@ -35,21 +35,21 @@ def compute_confusion_matrix(
 def plot_confusion_matrix(
         cm: np.ndarray,
         class_names: Optional[List[str]] = None,
-        title: str = "Matriz de confusión",
+        title: str = "Confusion Matrix",
         cmap: str = "Blues",
         normalize: bool = False,
         figsize: tuple = (7, 6)
 ) -> None:
     """
-    Grafica la matriz de confusión con etiquetas y escala de colores.
+    Plots the confusion matrix with labels and color scale.
 
     Args:
-        cm (np.ndarray): Matriz de confusión.
-        class_names (list, opcional): Nombres de las clases.
-        title (str): Título del gráfico.
-        cmap (str): Mapa de colores.
-        normalize (bool): Si normalizar la matriz por filas.
-        figsize (tuple): Tamaño de la figura.
+        cm (np.ndarray): Confusion matrix.
+        class_names (list, optional): Class names.
+        title (str): Plot title.
+        cmap (str): Color map.
+        normalize (bool): Whether to normalize the matrix by rows.
+        figsize (tuple): Figure size.
     """
     if normalize:
         cm = cm.astype('float') / cm.sum(axis=1, keepdims=True)
@@ -57,8 +57,8 @@ def plot_confusion_matrix(
     sns.heatmap(cm, annot=True, fmt='.2f' if normalize else 'd', cmap=cmap,
                 xticklabels=class_names if class_names else None,
                 yticklabels=class_names if class_names else None)
-    plt.xlabel('Predicción')
-    plt.ylabel('Real')
+    plt.xlabel('Prediction')
+    plt.ylabel('True')
     plt.title(title)
     plt.tight_layout()
     plt.show()
@@ -72,25 +72,25 @@ def compute_classification_metrics(
         as_dataframe: bool = False
 ) -> Union[Dict[str, Any], pd.DataFrame]:
     """
-    Calcula F1-score, precisión, recall y accuracy global y por clase.
+    Computes F1-score, precision, recall, and global and per-class accuracy.
 
     Args:
-        y_true (list o np.ndarray): Etiquetas reales.
-        y_pred (list o np.ndarray): Etiquetas predichas.
-        average (str): Tipo de promedio global ('macro', 'micro', 'weighted').
-        labels (list, opcional): Nombres de las clases.
-        as_dataframe (bool): Si devolver resultados como DataFrame.
+        y_true (list or np.ndarray): True labels.
+        y_pred (list or np.ndarray): Predicted labels.
+        average (str): Type of global average ('macro', 'micro', 'weighted').
+        labels (list, optional): Class names.
+        as_dataframe (bool): Whether to return results as DataFrame.
 
     Returns:
-        dict o pd.DataFrame: Métricas globales y por clase.
+        dict or pd.DataFrame: Global and per-class metrics.
     """
     metrics = {}
-    # Globales
+    # Global metrics
     metrics['accuracy'] = accuracy_score(y_true, y_pred)
     metrics['f1'] = f1_score(y_true, y_pred, average=average, zero_division=0)
     metrics['precision'] = precision_score(y_true, y_pred, average=average, zero_division=0)
     metrics['recall'] = recall_score(y_true, y_pred, average=average, zero_division=0)
-    # Por clase
+    # Per-class metrics
     metrics['f1_per_class'] = f1_score(y_true, y_pred, average=None, zero_division=0)
     metrics['precision_per_class'] = precision_score(y_true, y_pred, average=None, zero_division=0)
     metrics['recall_per_class'] = recall_score(y_true, y_pred, average=None, zero_division=0)

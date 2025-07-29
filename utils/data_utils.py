@@ -1,8 +1,8 @@
 """
 data_utils.py
 
-Utilidades para descarga, carga y preprocesamiento de datasets (CIFAR-10 y FashionMNIST)
-para proyectos de deep learning en edge/federated learning.
+Utilities for downloading, loading, and preprocessing datasets (CIFAR-10 and FashionMNIST)
+for deep learning projects in edge/federated learning.
 """
 
 import os
@@ -11,10 +11,10 @@ from typing import Tuple, Optional
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 
-# Carpeta base para almacenar los datos
+# Base folder to store data
 data_root = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
 
-# Estadísticas recomendadas para normalización
+# Recommended statistics for normalization
 CIFAR10_MEAN = (0.4914, 0.4822, 0.4465)
 CIFAR10_STD = (0.2023, 0.1994, 0.2010)
 FASHIONMNIST_MEAN = (0.2860,)
@@ -31,22 +31,22 @@ def get_cifar10_dataloaders(
         data_dir: Optional[str] = None
 ) -> Tuple[DataLoader, DataLoader]:
     """
-    Descarga (si es necesario), prepara y retorna los DataLoaders de entrenamiento y test para CIFAR-10.
+    Downloads (if necessary), prepares, and returns the training and test DataLoaders for CIFAR-10.
 
     Args:
-        batch_size (int): Tamaño de batch para los DataLoaders.
-        shuffle_train (bool): Si barajar el set de entrenamiento.
-        shuffle_test (bool): Si barajar el set de test.
-        num_workers (int): Número de workers para los DataLoaders.
-        data_augmentation (bool): Si aplicar aumentación de datos al entrenamiento.
-        download (bool): Si descargar el dataset si no está disponible.
-        data_dir (str, optional): Ruta personalizada para almacenar los datos.
+        batch_size (int): Batch size for the DataLoaders.
+        shuffle_train (bool): Whether to shuffle the training set.
+        shuffle_test (bool): Whether to shuffle the test set.
+        num_workers (int): Number of workers for the DataLoaders.
+        data_augmentation (bool): Whether to apply data augmentation to training.
+        download (bool): Whether to download the dataset if not available.
+        data_dir (str, optional): Custom path to store the data.
 
     Returns:
         Tuple[DataLoader, DataLoader]: (train_loader, test_loader)
     """
     dir_ = data_dir or data_root
-    # Transforms para entrenamiento
+    # Training transforms
     train_transforms = [
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
@@ -86,22 +86,22 @@ def get_fashionmnist_dataloaders(
         data_dir: Optional[str] = None
 ) -> Tuple[DataLoader, DataLoader]:
     """
-    Descarga (si es necesario), prepara y retorna los DataLoaders de entrenamiento y test para FashionMNIST.
+    Downloads (if necessary), prepares, and returns the training and test DataLoaders for FashionMNIST.
 
     Args:
-        batch_size (int): Tamaño de batch para los DataLoaders.
-        shuffle_train (bool): Si barajar el set de entrenamiento.
-        shuffle_test (bool): Si barajar el set de test.
-        num_workers (int): Número de workers para los DataLoaders.
-        data_augmentation (bool): Si aplicar aumentación de datos al entrenamiento.
-        download (bool): Si descargar el dataset si no está disponible.
-        data_dir (str, optional): Ruta personalizada para almacenar los datos.
+        batch_size (int): Batch size for the DataLoaders.
+        shuffle_train (bool): Whether to shuffle the training set.
+        shuffle_test (bool): Whether to shuffle the test set.
+        num_workers (int): Number of workers for the DataLoaders.
+        data_augmentation (bool): Whether to apply data augmentation to training.
+        download (bool): Whether to download the dataset if not available.
+        data_dir (str, optional): Custom path to store the data.
 
     Returns:
         Tuple[DataLoader, DataLoader]: (train_loader, test_loader)
     """
     dir_ = data_dir or data_root
-    # Transforms para entrenamiento
+    # Training transforms
     train_transforms = []
     if data_augmentation:
         train_transforms += [
@@ -136,7 +136,7 @@ def get_fashionmnist_dataloaders(
 
 def get_cifar10_testloader(batch_size: int = 128, num_workers: int = 2, data_dir: Optional[str] = None):
     """
-    Devuelve solo el DataLoader de test de CIFAR-10, normalizado.
+    Returns only the normalized CIFAR-10 test DataLoader.
     """
     dir_ = data_dir or data_root
     test_transform = transforms.Compose([

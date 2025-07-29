@@ -1,7 +1,7 @@
 """
 export_utils.py
 
-Utilidades para guardar, cargar, exportar y quantizar modelos PyTorch para edge/federated learning.
+Utilities for saving, loading, exporting, and quantizing PyTorch models for edge/federated learning.
 """
 
 import os
@@ -13,7 +13,7 @@ from torch import nn
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 
-# Carpeta base para almacenar los datos
+# Base folder to store models
 data_root = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models_saved')
 
 
@@ -24,13 +24,13 @@ def save_model(
         extra: Optional[Dict[str, Any]] = None
 ) -> None:
     """
-    Guarda un modelo PyTorch en formato .pt en la carpeta data_root, incluyendo opcionalmente el estado del optimizador y otros datos.
+    Saves a PyTorch model in .pt format in the data_root folder, optionally including the optimizer state and other data.
 
     Args:
-        model (nn.Module): Modelo a guardar.
-        file_name (str): Nombre del archivo .pt (no path completo).
-        optimizer (Optimizer, opcional): Optimizador a guardar.
-        extra (dict, opcional): Diccionario con información adicional a guardar.
+        model (nn.Module): Model to save.
+        file_name (str): .pt file name (not full path).
+        optimizer (Optimizer, optional): Optimizer to save.
+        extra (dict, optional): Dictionary with additional information to save.
     """
     os.makedirs(data_root, exist_ok=True)
     path = os.path.join(data_root, file_name)
@@ -49,16 +49,16 @@ def load_model(
         map_location: Optional[str] = None
 ) -> Optional[Optimizer]:
     """
-    Carga los pesos de un modelo PyTorch desde un archivo .pt en la carpeta data_root. Puede cargar también el estado del optimizador.
+    Loads the weights of a PyTorch model from a .pt file in the data_root folder. Can also load the optimizer state.
 
     Args:
-        model (nn.Module): Modelo donde cargar los pesos.
-        file_name (str): Nombre del archivo .pt (no path completo).
-        optimizer (Optimizer, opcional): Optimizador para cargar su estado.
-        map_location (str, opcional): Dispositivo destino ('cpu', 'cuda', etc.).
+        model (nn.Module): Model to load weights into.
+        file_name (str): .pt file name (not full path).
+        optimizer (Optimizer, optional): Optimizer to load its state.
+        map_location (str, optional): Target device ('cpu', 'cuda', etc.).
 
     Returns:
-        Optimizer o None: El optimizador con el estado cargado, si se proporciona.
+        Optimizer or None: The optimizer with loaded state, if provided.
     """
     path = os.path.join(data_root, file_name)
     checkpoint = torch.load(path, map_location=map_location, weights_only=True)
@@ -80,17 +80,17 @@ def export_to_onnx(
         dynamic_axes: Optional[Dict[str, Dict[int, str]]] = None
 ) -> None:
     """
-    Exporta un modelo PyTorch a formato ONNX.
+    Exports a PyTorch model to ONNX format.
 
     Args:
-        model (nn.Module): Modelo a exportar.
-        dummy_input (torch.Tensor): Tensor de entrada simulado (shape igual a la esperada por el modelo).
-        path (str): Ruta donde guardar el archivo .onnx.
-        num_classes (int, opcional): Número de clases de salida (si aplica).
-        input_names (list, opcional): Nombres de las entradas.
-        output_names (list, opcional): Nombres de las salidas.
-        opset_version (int): Versión de ONNX opset.
-        dynamic_axes (dict, opcional): Ejes dinámicos para batch size variable, etc.
+        model (nn.Module): Model to export.
+        dummy_input (torch.Tensor): Simulated input tensor (shape as expected by the model).
+        path (str): Path to save the .onnx file.
+        num_classes (int, optional): Number of output classes (if applicable).
+        input_names (list, optional): Input names.
+        output_names (list, optional): Output names.
+        opset_version (int): ONNX opset version.
+        dynamic_axes (dict, optional): Dynamic axes for variable batch size, etc.
     """
     model.eval()
     if num_classes is not None and hasattr(model, 'num_classes'):
@@ -112,13 +112,13 @@ def quantize_model_dynamic(
         model: nn.Module
 ) -> nn.Module:
     """
-    Aplica quantization dinámica (INT8) a un modelo PyTorch y devuelve el modelo quantizado.
+    Applies dynamic quantization (INT8) to a PyTorch model and returns the quantized model.
 
     Args:
-        model (nn.Module): Modelo a quantizar.
+        model (nn.Module): Model to quantize.
 
     Returns:
-        nn.Module: Modelo quantizado (dinámicamente).
+        nn.Module: Quantized model (dynamically).
     """
     import torch.quantization
     quantized_model = torch.quantization.quantize_dynamic(
@@ -133,15 +133,15 @@ def quantize_model_static(
         device: str = 'cpu'
 ) -> nn.Module:
     """
-    Aplica quantization estática (INT8) a un modelo PyTorch usando un DataLoader de calibración.
+    Applies static quantization (INT8) to a PyTorch model using a calibration DataLoader.
 
     Args:
-        model (nn.Module): Modelo a quantizar.
-        calibration_loader (DataLoader): DataLoader para calibración.
-        device (str): Dispositivo ('cpu' recomendado para quantization estática).
+        model (nn.Module): Model to quantize.
+        calibration_loader (DataLoader): DataLoader for calibration.
+        device (str): Device ('cpu' recommended for static quantization).
 
     Returns:
-        nn.Module: Modelo quantizado (estáticamente).
+        nn.Module: Quantized model (statically).
     """
     import torch.quantization
     model.eval()
@@ -164,28 +164,28 @@ def compare_model_size_and_accuracy(
         criterion: Optional[nn.Module] = None
 ) -> Dict[str, Any]:
     """
-    Compara el tamaño y accuracy entre un modelo original y su versión quantizada.
+    Compares the size and accuracy between an original model and its quantized version.
 
     Args:
-        model_fp (nn.Module): Modelo original (float32).
-        model_int8 (nn.Module): Modelo quantizado (int8).
-        test_loader (DataLoader): DataLoader de test.
-        device (str): Dispositivo para evaluación.
-        criterion (nn.Module, opcional): Función de pérdida.
+        model_fp (nn.Module): Original model (float32).
+        model_int8 (nn.Module): Quantized model (int8).
+        test_loader (DataLoader): Test DataLoader.
+        device (str): Device for evaluation.
+        criterion (nn.Module, optional): Loss function.
 
     Returns:
-        Dict[str, Any]: Diccionario con tamaños (bytes), accuracy y diferencia.
+        Dict[str, Any]: Dictionary with sizes (bytes), accuracy, and difference.
     """
     import tempfile
     import os
-    # Guardar temporalmente ambos modelos
+    # Temporarily save both models
     with tempfile.NamedTemporaryFile(delete=False) as f_fp, tempfile.NamedTemporaryFile(delete=False) as f_int8:
         torch.save(model_fp.state_dict(), f_fp.name)
         torch.save(model_int8.state_dict(), f_int8.name)
         size_fp = os.path.getsize(f_fp.name)
         size_int8 = os.path.getsize(f_int8.name)
 
-    # Evaluar accuracy
+    # Evaluate accuracy
     def eval_acc(model):
         model.eval()
         model.to(device)
@@ -201,7 +201,7 @@ def compare_model_size_and_accuracy(
 
     acc_fp = eval_acc(model_fp)
     acc_int8 = eval_acc(model_int8)
-    # Limpiar archivos temporales
+    # Clean up temporary files
     os.remove(f_fp.name)
     os.remove(f_int8.name)
     return {
