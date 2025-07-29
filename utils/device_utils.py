@@ -1,5 +1,6 @@
 import platform
 
+
 def get_windows_cpu_name():
     import subprocess
     # Try WMIC
@@ -25,6 +26,7 @@ def get_windows_cpu_name():
         pass
     return None
 
+
 def get_cpu_name():
     import platform
     try:
@@ -41,6 +43,7 @@ def get_cpu_name():
     except Exception:
         pass
     return platform.processor() or platform.uname().processor or "Generic CPU"
+
 
 def get_available_devices(backend='pytorch'):
     devices = []
@@ -64,6 +67,7 @@ def get_available_devices(backend='pytorch'):
         devices.append({'name': 'CPU', 'type': 'CPU', 'id': None})
     return devices
 
+
 def get_device_type_openvino(dev_name):
     if 'CPU' in dev_name:
         return 'CPU'
@@ -75,12 +79,14 @@ def get_device_type_openvino(dev_name):
         return 'VPU'
     return 'OTHER'
 
+
 def print_available_devices(backend='pytorch'):
     devices = get_available_devices(backend)
     print(f"Available devices for backend '{backend}':")
     for d in devices:
         id_str = f" (id {d['id']})" if d['id'] is not None else ""
         print(f"- {d['name']} [{d['type']}{id_str}]")
+
 
 def select_main_device(devices):
     # Priority: GPU > NPU > VPU > CPU > other
@@ -92,12 +98,14 @@ def select_main_device(devices):
     d = devices[0]
     return get_device_object(d)
 
+
 def get_device_object(d):
     # Returns the appropriate device object according to the type
     if d['type'] == 'GPU':
         try:
             import torch
-            return torch.device(f"cuda:{d['id']}") if d['id'] is not None else torch.device('cuda'), d['name'], d['type'], d['id']
+            return torch.device(f"cuda:{d['id']}") if d['id'] is not None else torch.device('cuda'), d['name'], d[
+                'type'], d['id']
         except ImportError:
             pass
     if d['type'] == 'CPU':
@@ -108,6 +116,7 @@ def get_device_object(d):
             pass
     # For NPU, VPU or others, just return the name
     return d['name'], d['name'], d['type'], d['id']
+
 
 def get_eval_devices(devices):
     eval_devices = []
@@ -128,6 +137,7 @@ def get_eval_devices(devices):
             eval_devices.append(d['name'])
     return list({str(dev): dev for dev in eval_devices}.values())
 
+
 def _get_fullname_from_torch_device(dev, devices):
     if dev.type == 'cuda':
         dev_index = getattr(dev, 'index', None)
@@ -143,11 +153,13 @@ def _get_fullname_from_torch_device(dev, devices):
                 return get_cpu_name()
     return None
 
+
 def _get_fullname_from_str_device(dev, devices):
     for d in devices:
         if isinstance(d, dict) and d.get('name') == dev:
             return d.get('name')
     return None
+
 
 def _get_fallback_fullname(dev):
     if hasattr(dev, 'type'):
@@ -164,6 +176,7 @@ def _get_fallback_fullname(dev):
         return cpuinfo.get_cpu_info().get('brand_raw')
     except Exception:
         return platform.processor() or platform.uname().processor or 'CPU'
+
 
 def get_device_fullname(dev, devices=None):
     """
