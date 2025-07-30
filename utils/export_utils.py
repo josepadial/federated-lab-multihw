@@ -4,17 +4,27 @@ export_utils.py
 Utilities for saving, loading, exporting, and quantizing PyTorch models for edge/federated learning.
 """
 
+import logging
 import os
-from typing import Optional, Dict, Any
+import tempfile
+from typing import Optional, Dict, Any, List
 
 import torch
 import torch.onnx
+import torch.quantization
 from torch import nn
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Base folder to store models
 data_root = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models_saved')
+
+MODEL_INSTANCE_ERROR = "model must be a torch.nn.Module instance."
+PROVIDED_MODEL_INSTANCE_ERROR = "Provided model is not a torch.nn.Module instance."
 
 
 def save_model(
@@ -31,7 +41,16 @@ def save_model(
         file_name (str): .pt file name (not full path).
         optimizer (Optimizer, optional): Optimizer to save.
         extra (dict, optional): Dictionary with additional information to save.
+
+    Raises:
+        ValueError: If model is not an nn.Module or file_name is not a string.
     """
+    if not isinstance(model, nn.Module):
+        logger.error(PROVIDED_MODEL_INSTANCE_ERROR)
+        raise ValueError(MODEL_INSTANCE_ERROR)
+    if not isinstance(file_name, str):
+        logger.error("file_name must be a string.")
+        raise ValueError("file_name must be a string.")
     os.makedirs(data_root, exist_ok=True)
     path = os.path.join(data_root, file_name)
     state = {'model_state_dict': model.state_dict()}
@@ -40,6 +59,7 @@ def save_model(
     if extra is not None:
         state.update(extra)
     torch.save(state, path)
+    logger.info(f"Model saved to {path}")
 
 
 def load_model(
@@ -59,12 +79,24 @@ def load_model(
 
     Returns:
         Optimizer or None: The optimizer with loaded state, if provided.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        ValueError: If model is not an nn.Module.
     """
+    if not isinstance(model, nn.Module):
+        logger.error(PROVIDED_MODEL_INSTANCE_ERROR)
+        raise ValueError(MODEL_INSTANCE_ERROR)
     path = os.path.join(data_root, file_name)
+    if not os.path.isfile(path):
+        logger.error(f"Model file {path} does not exist.")
+        raise FileNotFoundError(f"Model file {path} does not exist.")
     checkpoint = torch.load(path, map_location=map_location, weights_only=True)
     model.load_state_dict(checkpoint['model_state_dict'])
+    logger.info(f"Model loaded from {path}")
     if optimizer is not None and 'optimizer_state_dict' in checkpoint:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        logger.info("Optimizer state loaded.")
         return optimizer
     return None
 
@@ -74,8 +106,8 @@ def export_to_onnx(
         dummy_input: torch.Tensor,
         path: str,
         num_classes: Optional[int] = None,
-        input_names: Optional[list] = None,
-        output_names: Optional[list] = None,
+        input_names: Optional[List[str]] = None,
+        output_names: Optional[List[str]] = None,
         opset_version: int = 12,
         dynamic_axes: Optional[Dict[str, Dict[int, str]]] = None
 ) -> None:
@@ -90,8 +122,17 @@ def export_to_onnx(
         input_names (list, optional): Input names.
         output_names (list, optional): Output names.
         opset_version (int): ONNX opset version.
-        dynamic_axes (dict, optional): Dynamic axes for variable batch size, etc.
+        dynamic_axes (dict, optional): Dynamic axes for variable batch size, etc
+
+    Raises:
+        ValueError: If model or dummy_input are not valid.
     """
+    if not isinstance(model, nn.Module):
+        logger.error(PROVIDED_MODEL_INSTANCE_ERROR)
+        raise ValueError(MODEL_INSTANCE_ERROR)
+    if not isinstance(dummy_input, torch.Tensor):
+        logger.error("dummy_input must be a torch.Tensor.")
+        raise ValueError("dummy_input must be a torch.Tensor.")
     model.eval()
     if num_classes is not None and hasattr(model, 'num_classes'):
         model.num_classes = num_classes
@@ -106,6 +147,7 @@ def export_to_onnx(
         output_names=output_names or ["output"],
         dynamic_axes=dynamic_axes or {"input": {0: "batch_size"}, "output": {0: "batch_size"}}
     )
+    logger.info(f"Model exported to ONNX at {path}")
 
 
 def quantize_model_dynamic(
@@ -119,11 +161,18 @@ def quantize_model_dynamic(
 
     Returns:
         nn.Module: Quantized model (dynamically).
+
+    Raises:
+        ValueError: If model is not an nn.Module.
     """
-    import torch.quantization
+    if not isinstance(model, nn.Module):
+        logger.error(PROVIDED_MODEL_INSTANCE_ERROR)
+        raise ValueError(MODEL_INSTANCE_ERROR)
+
     quantized_model = torch.quantization.quantize_dynamic(
         model, {nn.Linear, nn.LSTM, nn.GRU, nn.Conv2d}, dtype=torch.qint8
     )
+    logger.info("Model dynamically quantized (INT8).")
     return quantized_model
 
 
@@ -142,8 +191,17 @@ def quantize_model_static(
 
     Returns:
         nn.Module: Quantized model (statically).
+
+    Raises:
+        ValueError: If model is not an nn.Module or calibration_loader is not a DataLoader.
     """
-    import torch.quantization
+    if not isinstance(model, nn.Module):
+        logger.error(PROVIDED_MODEL_INSTANCE_ERROR)
+        raise ValueError(MODEL_INSTANCE_ERROR)
+    if not isinstance(calibration_loader, DataLoader):
+        logger.error("calibration_loader must be a torch.utils.data.DataLoader.")
+        raise ValueError("calibration_loader must be a torch.utils.data.DataLoader.")
+
     model.eval()
     model.to(device)
     model.qconfig = torch.quantization.get_default_qconfig('fbgemm')
@@ -153,13 +211,14 @@ def quantize_model_static(
             inputs = inputs.to(device)
             model(inputs)
     torch.quantization.convert(model, inplace=True)
+    logger.info("Model statically quantized (INT8).")
     return model
 
 
 def compare_model_size_and_accuracy(
         model_fp: nn.Module,
         model_int8: nn.Module,
-        test_loader: 'DataLoader',
+        test_loader: DataLoader,
         device: str = 'cpu',
         criterion: Optional[nn.Module] = None
 ) -> Dict[str, Any]:
@@ -176,8 +235,7 @@ def compare_model_size_and_accuracy(
     Returns:
         Dict[str, Any]: Dictionary with sizes (bytes), accuracy, and difference.
     """
-    import tempfile
-    import os
+
     # Temporarily save both models
     with tempfile.NamedTemporaryFile(delete=False) as f_fp, tempfile.NamedTemporaryFile(delete=False) as f_int8:
         torch.save(model_fp.state_dict(), f_fp.name)
@@ -185,8 +243,7 @@ def compare_model_size_and_accuracy(
         size_fp = os.path.getsize(f_fp.name)
         size_int8 = os.path.getsize(f_int8.name)
 
-    # Evaluate accuracy
-    def eval_acc(model):
+    def eval_acc(model: nn.Module) -> float:
         model.eval()
         model.to(device)
         correct, total = 0, 0
@@ -201,9 +258,10 @@ def compare_model_size_and_accuracy(
 
     acc_fp = eval_acc(model_fp)
     acc_int8 = eval_acc(model_int8)
-    # Clean up temporary files
     os.remove(f_fp.name)
     os.remove(f_int8.name)
+    logger.info(f"Model size (FP32): {size_fp} bytes, Model size (INT8): {size_int8} bytes")
+    logger.info(f"Accuracy (FP32): {acc_fp:.4f}, Accuracy (INT8): {acc_int8:.4f}")
     return {
         'size_fp32_bytes': size_fp,
         'size_int8_bytes': size_int8,
@@ -211,3 +269,45 @@ def compare_model_size_and_accuracy(
         'accuracy_int8': acc_int8,
         'accuracy_diff': acc_fp - acc_int8
     }
+
+
+def load_trained_model(
+        model_class: type,
+        model_kwargs: dict,
+        default_filename: str,
+        path: Optional[str] = None,
+        map_location: str = 'cpu'
+) -> nn.Module:
+    """
+    Instantiates a model and loads trained weights from the specified path or a default location.
+
+    Args:
+        model_class (type): The class of the model to instantiate.
+        model_kwargs (dict): Arguments to pass to the model constructor.
+        default_filename (str): Default filename for the weights.
+        path (str, optional): Path to the .pt file. If None, uses default location.
+        map_location (str): Device to map the model ('cpu', 'cuda', etc).
+
+    Returns:
+        nn.Module: Model with loaded weights, set to eval mode.
+
+    Raises:
+        FileNotFoundError: If the weights file does not exist.
+        RuntimeError: If loading the state dict fails.
+    """
+    data_root = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models_saved')
+    if path is None:
+        path = os.path.join(data_root, default_filename)
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"Model weights file not found: {path}")
+    model = model_class(**model_kwargs)
+    state = torch.load(path, map_location=map_location, weights_only=True)
+    try:
+        if 'model_state_dict' in state:
+            model.load_state_dict(state['model_state_dict'])
+        else:
+            model.load_state_dict(state)
+    except Exception as e:
+        raise RuntimeError(f"Failed to load model state dict: {e}")
+    model.eval()
+    return model

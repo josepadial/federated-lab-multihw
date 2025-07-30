@@ -1,16 +1,25 @@
 """
 metrics_utils.py
 
-Functions to compute and display advanced evaluation metrics in deep learning projects.
+Utilities to compute and display advanced evaluation metrics for deep learning projects.
+Includes confusion matrix, F1, precision, recall, and accuracy metrics, with plotting and DataFrame support.
 """
 
-from typing import List, Optional, Dict, Any, Union
+import logging
+from typing import List, Optional, Dict, Any, Union, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score, accuracy_score
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+Y_EMPTY_ERROR = "y_true and y_pred must not be empty."
+Y_LENGTH_ERROR = "y_true and y_pred must have the same length."
 
 
 def compute_confusion_matrix(
@@ -28,8 +37,17 @@ def compute_confusion_matrix(
 
     Returns:
         np.ndarray: Confusion matrix.
+    Raises:
+        ValueError: If y_true or y_pred are empty or mismatched.
     """
-    return confusion_matrix(y_true, y_pred, labels=range(len(labels)) if labels else None)
+    if len(y_true) == 0 or len(y_pred) == 0:
+        logger.error(Y_EMPTY_ERROR)
+        raise ValueError(Y_EMPTY_ERROR)
+    if len(y_true) != len(y_pred):
+        logger.error(Y_LENGTH_ERROR)
+        raise ValueError(Y_LENGTH_ERROR)
+    label_range = range(len(labels)) if labels else None
+    return confusion_matrix(y_true, y_pred, labels=label_range)
 
 
 def plot_confusion_matrix(
@@ -38,21 +56,28 @@ def plot_confusion_matrix(
         title: str = "Confusion Matrix",
         cmap: str = "Blues",
         normalize: bool = False,
-        figsize: tuple = (7, 6)
+        figsize: Tuple[int, int] = (7, 6)
 ) -> None:
     """
     Plots the confusion matrix with labels and color scale.
 
     Args:
         cm (np.ndarray): Confusion matrix.
-        class_names (list, optional): Class names.
+        class_names (list, optional): Class names for axes.
         title (str): Plot title.
         cmap (str): Color map.
         normalize (bool): Whether to normalize the matrix by rows.
         figsize (tuple): Figure size.
+    Raises:
+        ValueError: If cm is not a 2D square matrix.
     """
+    if cm.ndim != 2 or cm.shape[0] != cm.shape[1]:
+        logger.error("Confusion matrix must be a 2D square matrix.")
+        raise ValueError("Confusion matrix must be a 2D square matrix.")
     if normalize:
-        cm = cm.astype('float') / cm.sum(axis=1, keepdims=True)
+        with np.errstate(all='ignore'):
+            cm = cm.astype('float') / cm.sum(axis=1, keepdims=True)
+            cm = np.nan_to_num(cm)
     plt.figure(figsize=figsize)
     sns.heatmap(cm, annot=True, fmt='.2f' if normalize else 'd', cmap=cmap,
                 xticklabels=class_names if class_names else None,
@@ -70,7 +95,7 @@ def compute_classification_metrics(
         average: str = 'macro',
         labels: Optional[List[str]] = None,
         as_dataframe: bool = False
-) -> Union[Dict[str, Any], pd.DataFrame]:
+) -> Union[Dict[str, Any], Dict[str, pd.DataFrame]]:
     """
     Computes F1-score, precision, recall, and global and per-class accuracy.
 
@@ -82,18 +107,25 @@ def compute_classification_metrics(
         as_dataframe (bool): Whether to return results as DataFrame.
 
     Returns:
-        dict or pd.DataFrame: Global and per-class metrics.
+        dict or dict of pd.DataFrame: Global and per-class metrics.
+    Raises:
+        ValueError: If y_true or y_pred are empty or mismatched.
     """
-    metrics = {}
+    if len(y_true) == 0 or len(y_pred) == 0:
+        logger.error(Y_EMPTY_ERROR)
+        raise ValueError(Y_EMPTY_ERROR)
+    if len(y_true) != len(y_pred):
+        logger.error(Y_LENGTH_ERROR)
+        raise ValueError(Y_LENGTH_ERROR)
+    metrics = {'accuracy': accuracy_score(y_true, y_pred),
+               'f1': f1_score(y_true, y_pred, average=average, zero_division=0),
+               'precision': precision_score(y_true, y_pred, average=average, zero_division=0),
+               'recall': recall_score(y_true, y_pred, average=average, zero_division=0),
+               'f1_per_class': f1_score(y_true, y_pred, average=None, zero_division=0),
+               'precision_per_class': precision_score(y_true, y_pred, average=None, zero_division=0),
+               'recall_per_class': recall_score(y_true, y_pred, average=None, zero_division=0)}
     # Global metrics
-    metrics['accuracy'] = accuracy_score(y_true, y_pred)
-    metrics['f1'] = f1_score(y_true, y_pred, average=average, zero_division=0)
-    metrics['precision'] = precision_score(y_true, y_pred, average=average, zero_division=0)
-    metrics['recall'] = recall_score(y_true, y_pred, average=average, zero_division=0)
     # Per-class metrics
-    metrics['f1_per_class'] = f1_score(y_true, y_pred, average=None, zero_division=0)
-    metrics['precision_per_class'] = precision_score(y_true, y_pred, average=None, zero_division=0)
-    metrics['recall_per_class'] = recall_score(y_true, y_pred, average=None, zero_division=0)
     if labels:
         class_labels = labels
     else:

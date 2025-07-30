@@ -1,52 +1,64 @@
+"""
+efficientnet_lite0.py
+
+Implementation of EfficientNet-Lite0 for image classification (e.g., CIFAR-10).
+Includes model definition and utility to load trained weights.
+"""
+
+from typing import Optional
+
 import torch
 import torch.nn as nn
 from torchvision.models import efficientnet_b0, EfficientNet_B0_Weights
 
+from utils.export_utils import load_trained_model
+
 
 class EfficientNetLite0(nn.Module):
     """
-    EfficientNet-lite0 adaptado para clasificación de imágenes pequeñas (CIFAR-10, 32x32).
-
-    Utiliza la arquitectura EfficientNet-B0 de torchvision como base, ajustando la primera capa y el clasificador final
-    para imágenes de 32x32 y 10 clases. Es una alternativa ligera y eficiente para despliegue en edge/federated learning.
+    EfficientNet-Lite0 adapted for small images (e.g., CIFAR-10, 32x32) and custom number of classes.
 
     Args:
-        num_classes (int): Número de clases de salida (por defecto 10).
-        pretrained (bool): Si cargar pesos preentrenados en ImageNet (por defecto False).
+        num_classes (int): Number of output classes (default 10).
+        pretrained (bool): Whether to load ImageNet pre-trained weights (default False).
     """
 
     def __init__(self, num_classes: int = 10, pretrained: bool = False):
         super().__init__()
-        # Cargar EfficientNet-B0 base
-        if pretrained:
-            weights = EfficientNet_B0_Weights.IMAGENET1K_V1
-        else:
-            weights = None
+        # Load EfficientNet-B0 base
+        weights = EfficientNet_B0_Weights.IMAGENET1K_V1 if pretrained else None
         self.model = efficientnet_b0(weights=weights)
-        # Ajustar la primera capa para imágenes 32x32 (stride=1)
+        # Adjust first conv layer for 32x32 images (stride=1)
         self.model.features[0][0] = nn.Conv2d(3, 32, kernel_size=3, stride=1, padding=1, bias=False)
-        # Ajustar el clasificador final para el número de clases
+        # Adjust classifier for custom number of classes
         in_features = self.model.classifier[-1].in_features
         self.model.classifier[-1] = nn.Linear(in_features, num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of EfficientNet-Lite0.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (N, 3, 32, 32).
+        Returns:
+            torch.Tensor: Output logits of shape (N, num_classes).
+        """
         return self.model(x)
 
 
-def load_trained_efficientnetlite0(path=None, num_classes=10, pretrained=False, map_location='cpu'):
+def load_trained_efficientnetlite0(
+        path: Optional[str] = None,
+        num_classes: int = 10,
+        pretrained: bool = False,
+        map_location: str = 'cpu'
+) -> EfficientNetLite0:
     """
-    Instancia un modelo EfficientNetLite0 y carga los pesos entrenados desde el path especificado o desde models_saved/efficientnetlite0_cifar10.pt.
+    Instantiates an EfficientNetLite0 model and loads trained weights from the specified path or from models_saved/efficientnetlite0_cifar10.pt.
     """
-    import os
-    data_root = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'models_saved')
-    if path is None:
-        path = os.path.join(data_root, 'efficientnetlite0_cifar10.pt')
-    model = EfficientNetLite0(num_classes=num_classes, pretrained=pretrained)
-    import torch
-    state = torch.load(path, map_location=map_location, weights_only=True)
-    if 'model_state_dict' in state:
-        model.load_state_dict(state['model_state_dict'])
-    else:
-        model.load_state_dict(state)
-    model.eval()
-    return model
+    return load_trained_model(
+        model_class=EfficientNetLite0,
+        model_kwargs={'num_classes': num_classes, 'pretrained': pretrained},
+        default_filename='efficientnetlite0_cifar10.pt',
+        path=path,
+        map_location=map_location
+    )
