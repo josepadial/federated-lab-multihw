@@ -348,9 +348,9 @@ def verify_onnx_dynamic_batch(onnx_path, input_shape, batch_sizes=[1, 4, 16]):
     return results
 
 
-def benchmark_onnx_inference(onnx_path, input_array, num_runs=100):
-    """Benchmarks ONNX Runtime inference latency."""
-    ort_session = ort.InferenceSession(str(onnx_path))
+def benchmark_onnx_inference(onnx_path, input_array, num_runs=100, use_cpu=True, use_cuda=False):
+    """Benchmarks ONNX Runtime inference latency using optimized session for CPU or CUDA."""
+    ort_session = optimized_onnx_inference_session(onnx_path, use_cpu=use_cpu, use_cuda=use_cuda, optimization_level="all")
     start = time.time()
     for _ in range(num_runs):
         ort_session.run(None, {ort_session.get_inputs()[0].name: input_array})
@@ -363,3 +363,31 @@ def compare_model_file_sizes(pytorch_path, onnx_path):
     pytorch_size = os.path.getsize(pytorch_path) / 1024
     onnx_size = os.path.getsize(onnx_path) / 1024
     return pytorch_size, onnx_size
+
+
+def optimized_onnx_inference_session(onnx_path: str,
+                                     use_cpu: bool = True,
+                                     use_cuda: bool = False,
+                                     optimization_level: str = "all") -> ort.InferenceSession:
+    """
+    Creates an optimized ONNX Runtime inference session for CPU or CUDA.
+    Args:
+        onnx_path (str): Path to ONNX model file.
+        use_cpu (bool): Whether to use CPUExecutionProvider.
+        use_cuda (bool): Whether to use CUDAExecutionProvider (NVIDIA GPU).
+        optimization_level (str): Optimization level for ONNX Runtime ("all", "basic", etc).
+    Returns:
+        ort.InferenceSession: Optimized inference session.
+    """
+    providers = []
+    provider_options = []
+    if use_cpu:
+        providers.append("CPUExecutionProvider")
+        provider_options.append({"ort": {"optimization_level": optimization_level}})
+    if use_cuda:
+        providers.append("CUDAExecutionProvider")
+        provider_options.append({})
+    if not providers:
+        providers = None
+        provider_options = None
+    return ort.InferenceSession(onnx_path, providers=providers, provider_options=provider_options)
