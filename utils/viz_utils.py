@@ -10,6 +10,8 @@ from typing import List, Dict, Optional, Any, Tuple
 
 import matplotlib.pyplot as plt
 import pandas as pd
+from IPython.display import display
+from tabulate import tabulate
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -35,6 +37,7 @@ def plot_loss_accuracy_curves(
     Raises:
         ValueError: If input lists are empty or mismatched.
     """
+
     def _plot_metric(ax, metric: str):
         for i, hist in enumerate(histories):
             label = labels[i] if labels and i < len(labels) else f"Model {i + 1}"
@@ -66,7 +69,6 @@ def show_comparative_table(
         metrics: List[Dict[str, Any]],
         model_names: Optional[List[str]] = None,
         columns: Optional[List[str]] = None,
-        tablefmt: str = 'github',
         sort_by: Optional[str] = None
 ) -> pd.DataFrame:
     """
@@ -76,7 +78,6 @@ def show_comparative_table(
         metrics (List[Dict]): List of dictionaries with metrics per model.
         model_names (List[str], optional): Model names.
         columns (List[str], optional): Columns to display.
-        tablefmt (str): Table format for printing (using tabulate).
         sort_by (str, optional): Column to sort the table by.
 
     Returns:
@@ -101,12 +102,6 @@ def show_comparative_table(
         df = df[columns]
     if sort_by and sort_by in df.columns:
         df = df.sort_values(by=sort_by, ascending=False)
-    try:
-        from tabulate import tabulate
-        print(tabulate(df, headers='keys', tablefmt=tablefmt, showindex=True))
-    except ImportError:
-        logger.warning("tabulate not installed; printing DataFrame directly.")
-        print(df)
     return df
 
 
@@ -165,3 +160,49 @@ def plot_bar_comparison(
     plt.tight_layout()
     plt.show()
     plt.close()
+
+
+def plot_output_difference_histogram(torch_out, onnx_out, bins=30, color='skyblue'):
+    """Plots histogram of absolute differences between PyTorch and ONNX outputs."""
+    plt.figure(figsize=(6, 4))
+    plt.hist(abs(torch_out - onnx_out).flatten(), bins=bins, color=color)
+    plt.title('Absolute Difference: PyTorch vs ONNX Output')
+    plt.xlabel('Absolute Difference')
+    plt.ylabel('Frequency')
+    plt.show()
+
+
+def plot_inference_time_comparison(pytorch_times, onnx_times, labels):
+    """Plots bar chart comparing PyTorch and ONNX inference times (ms) for multiple models."""
+    import matplotlib.pyplot as plt
+    bar_width = 0.35
+    index = range(len(labels))
+    plt.figure(figsize=(8, 6))
+    plt.bar(index, [t * 1000 for t in pytorch_times], bar_width, label='PyTorch', color='orange')
+    plt.bar([i + bar_width for i in index], [t * 1000 for t in onnx_times], bar_width, label='ONNX', color='blue')
+    plt.xticks([i + bar_width / 2 for i in index], labels)
+    plt.ylabel('Average Inference Time (ms)')
+    plt.title('Inference Time Comparison (All Models)')
+    plt.legend()
+    plt.show()
+
+
+def plot_model_size_comparison(pytorch_sizes, onnx_sizes, labels):
+    """Plots bar chart comparing PyTorch and ONNX model file sizes (KB) for multiple models."""
+    import matplotlib.pyplot as plt
+    bar_width = 0.35
+    index = range(len(labels))
+    plt.figure(figsize=(8, 6))
+    plt.bar(index, pytorch_sizes, bar_width, label='PyTorch', color='orange')
+    plt.bar([i + bar_width for i in index], onnx_sizes, bar_width, label='ONNX', color='blue')
+    plt.xticks([i + bar_width / 2 for i in index], labels)
+    plt.ylabel('File Size (KB)')
+    plt.title('Model File Size Comparison (All Models)')
+    plt.legend()
+    plt.show()
+
+
+def display_dynamic_batch_table(batch_results):
+    """Displays a table of dynamic batch support results."""
+    batch_df = pd.DataFrame(batch_results)
+    display(batch_df)

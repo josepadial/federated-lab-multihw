@@ -7,8 +7,12 @@ Utilities for saving, loading, exporting, and quantizing PyTorch models for edge
 import logging
 import os
 import tempfile
+import time
 from typing import Optional, Dict, Any, List
 
+import numpy as np
+import onnx
+import onnxruntime as ort
 import torch
 import torch.onnx
 import torch.quantization
@@ -311,3 +315,51 @@ def load_trained_model(
         raise RuntimeError(f"Failed to load model state dict: {e}")
     model.eval()
     return model
+
+
+def check_onnx_integrity(path: str) -> bool:
+    """Checks if the ONNX model at path is well-formed."""
+    model = onnx.load(path)
+    onnx.checker.check_model(model)
+    return True
+
+
+def compare_pytorch_onnx_outputs(pytorch_model, onnx_path, test_batch):
+    """Compares outputs between PyTorch and ONNX Runtime for a batch."""
+    pytorch_model.eval()
+    with torch.no_grad():
+        torch_out = pytorch_model(test_batch).cpu().numpy()
+    ort_session = ort.InferenceSession(str(onnx_path))
+    ort_inputs = {ort_session.get_inputs()[0].name: test_batch.cpu().numpy()}
+    onnx_out = ort_session.run(None, ort_inputs)[0]
+    max_diff = np.max(np.abs(torch_out - onnx_out))
+    return max_diff, torch_out, onnx_out
+
+
+def verify_onnx_dynamic_batch(onnx_path, input_shape, batch_sizes=[1, 4, 16]):
+    """Verifies ONNX model supports dynamic batch sizes."""
+    ort_session = ort.InferenceSession(str(onnx_path))
+    results = []
+    for batch_size in batch_sizes:
+        dyn_input = torch.randn(batch_size, *input_shape).cpu().numpy()
+        ort_inputs = {ort_session.get_inputs()[0].name: dyn_input}
+        dyn_out = ort_session.run(None, ort_inputs)[0]
+        results.append({'Batch Size': batch_size, 'Output Shape': dyn_out.shape})
+    return results
+
+
+def benchmark_onnx_inference(onnx_path, input_array, num_runs=100):
+    """Benchmarks ONNX Runtime inference latency."""
+    ort_session = ort.InferenceSession(str(onnx_path))
+    start = time.time()
+    for _ in range(num_runs):
+        ort_session.run(None, {ort_session.get_inputs()[0].name: input_array})
+    avg_time = (time.time() - start) / num_runs
+    return avg_time
+
+
+def compare_model_file_sizes(pytorch_path, onnx_path):
+    """Returns file sizes in KB for PyTorch and ONNX models."""
+    pytorch_size = os.path.getsize(pytorch_path) / 1024
+    onnx_size = os.path.getsize(onnx_path) / 1024
+    return pytorch_size, onnx_size
