@@ -11,6 +11,7 @@ import subprocess
 from typing import List, Dict, Optional, Any
 
 import cpuinfo
+import numpy as np
 import torch
 from openvino import Core
 
@@ -304,3 +305,20 @@ def get_device_fullname(dev: Any, devices: Optional[List[Dict[str, Any]]] = None
             if name:
                 return name
     return _get_fallback_fullname(dev)
+
+
+def get_dummy_input(batch_size=1, shape=(3, 32, 32), dtype='float32', seed=None):
+    """
+    Returns a dummy input numpy array for benchmarking model inference.
+    Uses numpy.random.Generator for reproducibility and modern API.
+    Args:
+        batch_size (int): Batch size for input.
+        shape (tuple): Shape of a single input (channels, height, width).
+        dtype (str): Data type of the array.
+        seed (int, optional): Seed for reproducibility.
+    Returns:
+        np.ndarray: Dummy input array of shape (batch_size, *shape).
+    """
+    rng = np.random.default_rng(seed)
+    arr = rng.standard_normal((batch_size, *shape))
+    return arr.astype(dtype)
