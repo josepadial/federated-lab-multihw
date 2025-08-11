@@ -1,18 +1,33 @@
-# Paquetes principales de IA y federated learning
-flwr
-notebook
-openvino
-openvino-genai
-
-# Paquetes científicos básicos (si no están ya por conda)
-numpy
+# Core scientific stack
+numpy<2.3
 pandas
-matplotlib
-scikit-learn
-psutil
-tqdm
+protobuf<5
+py-cpuinfo
 
-# PyTorch (si no están ya por conda)
-pytorch
-torchvision
-torchaudio
+# Data science and ML
+scikit-learn==1.5.*
+matplotlib
+seaborn
+tqdm
+tabulate
+
+# Deep learning
+# torch: use pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu129
+
+# Federated learning
+flwr[simulation]==1.20.*
+
+# Model export and inference
+onnx
+onnxruntime
+
+# Intel OpenVINO
+openvino==2025.2.0
+openvino-genai==2025.2.0
+
+# Jupyter ecosystem
+notebook
+ipywidgets
+
+# Type hints and code insight
+pandas-stubs
