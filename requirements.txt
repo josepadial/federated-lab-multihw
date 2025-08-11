@@ -19,7 +19,7 @@ flwr[simulation]==1.20.*
 
 # Model export and inference
 onnx
-onnxruntime
+onnxruntime-directml
 
 # Intel OpenVINO
 openvino==2025.2.0
