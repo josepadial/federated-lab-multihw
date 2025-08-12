@@ -353,8 +353,10 @@ def benchmark_onnx_inference(onnx_path, input_array, num_runs=100, use_cpu=True,
     # CUDA provider validation
     available_providers = ort.get_available_providers()
     if use_cuda and "CUDAExecutionProvider" not in available_providers:
-        raise RuntimeError("CUDAExecutionProvider not available. ONNX inference will NOT run on NVIDIA GPU. Please install onnxruntime-gpu and ensure you have an NVIDIA GPU and CUDA drivers.")
-    ort_session = optimized_onnx_inference_session(onnx_path, use_cpu=use_cpu, use_cuda=use_cuda, optimization_level="all")
+        raise RuntimeError(
+            "CUDAExecutionProvider not available. ONNX inference will NOT run on NVIDIA GPU. Please install onnxruntime-gpu and ensure you have an NVIDIA GPU and CUDA drivers.")
+    ort_session = optimized_onnx_inference_session(onnx_path, use_cpu=use_cpu, use_cuda=use_cuda,
+                                                   optimization_level="all")
     start = time.time()
     for _ in range(num_runs):
         ort_session.run(None, {ort_session.get_inputs()[0].name: input_array})
@@ -395,3 +397,95 @@ def optimized_onnx_inference_session(onnx_path: str,
         providers = None
         provider_options = None
     return ort.InferenceSession(onnx_path, providers=providers, provider_options=provider_options)
+
+
+def benchmark_all_inference_modes(
+        model,
+        model_name,
+        test_batch,
+        onnx_file,
+        num_runs=100,
+        input_shape=None,
+        export_if_missing=True,
+        model_configs=None,
+        pytorch_dir=None
+):
+    """
+    Benchmarks inference time for PyTorch (CPU, CUDA) and ONNX (CPU, CUDA) for a given model and test batch.
+    Exports to ONNX if needed.
+    Returns a dictionary with all results and sizes.
+    """
+
+    results = {}
+    # Export/check ONNX
+    if export_if_missing and not os.path.exists(onnx_file):
+        sample_input = torch.randn(1, *input_shape, device=test_batch.device)
+        export_to_onnx(
+            model,
+            sample_input,
+            onnx_file,
+            input_names=['input'],
+            output_names=['output'],
+            opset_version=12,
+            dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}}
+        )
+    check_onnx_integrity(onnx_file)
+    # Compare outputs
+    max_diff, torch_out, onnx_out = compare_pytorch_onnx_outputs(model, onnx_file, test_batch)
+    batch_results = verify_onnx_dynamic_batch(onnx_file, input_shape, batch_sizes=[1, 4, 16])
+    # PyTorch CPU
+    model.eval()
+    pytorch_times_cpu = []
+    for _ in range(num_runs):
+        start = time.time()
+        with torch.no_grad():
+            _ = model(test_batch.cpu())
+        pytorch_times_cpu.append(time.time() - start)
+    pytorch_time_cpu = sum(pytorch_times_cpu) / num_runs if num_runs > 0 else None
+    # PyTorch CUDA
+    if torch.cuda.is_available():
+        model_cuda = model.to('cuda')
+        test_batch_cuda = test_batch.to('cuda')
+        pytorch_times_cuda = []
+        for _ in range(num_runs):
+            start = time.time()
+            with torch.no_grad():
+                _ = model_cuda(test_batch_cuda)
+            pytorch_times_cuda.append(time.time() - start)
+        pytorch_time_cuda = sum(pytorch_times_cuda) / num_runs if num_runs > 0 else None
+        model_cuda = model_cuda.to('cpu')
+    else:
+        pytorch_time_cuda = None
+    # ONNX CPU
+    onnx_time_cpu = benchmark_onnx_inference(onnx_file, test_batch.cpu().numpy(), num_runs=num_runs)
+    # ONNX CUDA
+    try:
+        onnx_time_cuda = benchmark_onnx_inference(onnx_file, test_batch.cpu().numpy(), num_runs=num_runs, use_cpu=False,
+                                                  use_cuda=True)
+    except RuntimeError as e:
+        print(f"[WARNING] Could not run ONNX on NVIDIA GPU: {e}")
+        onnx_time_cuda = None
+    # File sizes
+    pytorch_file = None
+    if model_configs and pytorch_dir:
+        pytorch_file = pytorch_dir / model_configs[model_name]['file']
+    if pytorch_file and os.path.exists(pytorch_file):
+        pytorch_file_size, onnx_file_size = compare_model_file_sizes(str(pytorch_file), onnx_file)
+    else:
+        pytorch_file_size = onnx_file_size = None
+    # Collect results
+    results = {
+        'Model': model_name,
+        'max_diff': max_diff,
+        'pytorch_time_cpu': pytorch_time_cpu,
+        'pytorch_time_cuda': pytorch_time_cuda,
+        'onnx_time_cpu': onnx_time_cpu,
+        'onnx_time_cuda': onnx_time_cuda,
+        'pytorch_size': pytorch_file_size,
+        'onnx_size': onnx_file_size,
+        'batch_results': batch_results,
+        'torch_out': torch_out,
+        'onnx_out': onnx_out,
+        'test_batch': test_batch
+    }
+    return results
