@@ -350,6 +350,10 @@ def verify_onnx_dynamic_batch(onnx_path, input_shape, batch_sizes=[1, 4, 16]):
 
 def benchmark_onnx_inference(onnx_path, input_array, num_runs=100, use_cpu=True, use_cuda=False):
     """Benchmarks ONNX Runtime inference latency using optimized session for CPU or CUDA."""
+    # CUDA provider validation
+    available_providers = ort.get_available_providers()
+    if use_cuda and "CUDAExecutionProvider" not in available_providers:
+        raise RuntimeError("CUDAExecutionProvider not available. ONNX inference will NOT run on NVIDIA GPU. Please install onnxruntime-gpu and ensure you have an NVIDIA GPU and CUDA drivers.")
     ort_session = optimized_onnx_inference_session(onnx_path, use_cpu=use_cpu, use_cuda=use_cuda, optimization_level="all")
     start = time.time()
     for _ in range(num_runs):
