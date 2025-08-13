@@ -11,8 +11,15 @@ from typing import Dict, Optional
 
 import numpy as np
 from openvino import Core
+try:
+    # Prefer official properties API when available (OV >= 2023.2)
+    from openvino import properties as ov_properties  # type: ignore
+    from openvino import Type as OvType  # type: ignore
+except Exception:  # Fallback for older packages; we'll use string keys
+    ov_properties = None
+    OvType = None  # type: ignore
 
-from .logging_utils import get_logger
+from utils.logging_utils import get_logger
 
 
 def _compile_model(ir_path: str, device: str):
@@ -21,6 +28,21 @@ def _compile_model(ir_path: str, device: str):
     logger.info("Reading IR: %s", ir_path)
     model = core.read_model(ir_path)
     logger.info("Compiling model for device: %s", device)
+    # On some OpenVINO NPU backends, setting an explicit FP32 inference precision hint is
+    # necessary to avoid unintended quantization or degraded accuracy.
+    if device.upper() == "NPU":
+        try:
+            if ov_properties is not None and OvType is not None:
+                return core.compile_model(
+                    model,
+                    device,
+                    {ov_properties.hint.inference_precision: OvType.f32},
+                )
+            # Fallback using legacy string key
+            return core.compile_model(model, device, {"INFERENCE_PRECISION_HINT": "f32"})
+        except Exception:
+            logger.warning("NPU compile with precision hint failed; falling back to default.")
+            return core.compile_model(model, device)
     return core.compile_model(model, device)
 
 
@@ -40,20 +62,38 @@ def benchmark_numpy(
     correct = 0
     total = 0
     # Warmup
-    for _ in range(warmup):
-        infer.infer({input_port: x})
+    if device.upper() == "NPU" and x.shape[0] != 1:
+        # Warmup a few single samples
+        for i in range(min(warmup, x.shape[0])):
+            _ = infer.infer({input_port: x[i:i+1]})
+    else:
+        for _ in range(warmup):
+            _ = infer.infer({input_port: x})
     # Timed
-    for _ in range(runs):
-        t0 = time.perf_counter()
-        out = infer.infer({input_port: x})[compiled.outputs[0]]
-        dt = time.perf_counter() - t0
-        lat.append(dt)
-        if y_true is not None:
-            pred = out.argmax(1)
-            correct += int((pred == y_true).sum())
-            total += y_true.shape[0]
-        else:
-            total += x.shape[0]
+    if device.upper() == "NPU" and x.shape[0] != 1:
+        # Per-sample loop to respect NPU batch=1 while keeping totals comparable
+        for _ in range(runs):
+            for i in range(x.shape[0]):
+                t0 = time.perf_counter()
+                out = infer.infer({input_port: x[i:i+1]})[compiled.outputs[0]]
+                dt = time.perf_counter() - t0
+                lat.append(dt)
+                if y_true is not None:
+                    pred = out.argmax(1)
+                    correct += int((pred == y_true[i:i+1]).sum())
+                total += 1
+    else:
+        for _ in range(runs):
+            t0 = time.perf_counter()
+            out = infer.infer({input_port: x})[compiled.outputs[0]]
+            dt = time.perf_counter() - t0
+            lat.append(dt)
+            if y_true is not None:
+                pred = out.argmax(1)
+                correct += int((pred == y_true).sum())
+                total += y_true.shape[0]
+            else:
+                total += x.shape[0]
     lat_ms = np.array(lat) * 1000.0
     lat_ms_mean = float(lat_ms.mean()) if lat_ms.size else 0.0
     lat_ms_p95 = float(np.percentile(lat_ms, 95)) if lat_ms.size else 0.0

@@ -15,7 +15,7 @@ from typing import Dict, List, Optional
 CSV_SCHEMA = [
     "ts", "exp_id", "model", "dataset", "precision", "engine", "provider",
     "batch", "warmup", "runs", "lat_ms_mean", "lat_ms_p95", "thr_ips", "acc",
-    "energy_j", "cached", "device_name", "cpu_name", "gpu_name", "os",
+    "energy_j", "dt_ms", "avg_power_w", "cached", "device_name", "cpu_name", "gpu_name", "os",
     "torch_ver", "ort_ver", "ov_ver", "driver_ver", "model_hash",
     "consistency_ok", "max_abs_diff_torch_ort", "max_abs_diff_torch_ov",
     "top1_agree_torch_ort", "top1_agree_torch_ov"
@@ -42,6 +42,33 @@ def csv_append_row(csv_path: str, row: Dict[str, object], schema: Optional[List[
     schema = schema or CSV_SCHEMA
     ensure_dir(os.path.dirname(csv_path) or ".")
     file_exists = os.path.isfile(csv_path)
+    # If file exists, check header compatibility; if mismatch, rewrite header
+    if file_exists:
+        try:
+            with open(csv_path, mode="r", newline="", encoding="utf-8") as rf:
+                reader = csv.reader(rf)
+                existing_header = next(reader, [])
+            if list(existing_header) != list(schema):
+                # Rewrite file with new header
+                with open(csv_path, mode="w", newline="", encoding="utf-8") as wf:
+                    writer = csv.DictWriter(wf, fieldnames=schema)
+                    writer.writeheader()
+                file_exists = True  # will append row below
+        except Exception:
+            # If any issue reading, recreate file with header
+            with open(csv_path, mode="w", newline="", encoding="utf-8") as wf:
+                writer = csv.DictWriter(wf, fieldnames=schema)
+                writer.writeheader()
+            file_exists = True
+    # Best-effort: auto-fill dt_ms and avg_power_w from last GPU energy sample if energy_j present.
+    try:
+        from utils.energy import LAST_ENERGY_STATS  # lazy import to avoid cycles at module import
+        if LAST_ENERGY_STATS and isinstance(row.get("energy_j", None), (int, float)):
+            row.setdefault("dt_ms", LAST_ENERGY_STATS.get("dt_ms", ""))
+            row.setdefault("avg_power_w", LAST_ENERGY_STATS.get("avg_power_w", ""))
+    except Exception:
+        pass
+
     with open(csv_path, mode="a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=schema)
         if not file_exists:
