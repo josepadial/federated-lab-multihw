@@ -3,13 +3,17 @@ federated-lab-multihw
 
 Clean, reproducible benchmarking across PyTorch, ONNX Runtime (CPU/CUDA), and OpenVINO on Windows with a single virtual environment.
 
+Documentation
+-------------
+- See [README](docs/README.md) for the full documentation set: overview, getting started, reproducibility, benchmarks, results, energy, troubleshooting.
+
 Notebook flow
 -------------
-- 00_check_env_and_tests.ipynb — validate environment, providers, and run smoke tests; writes reports/ artifacts.
-- 01_train_and_baseline.ipynb — train on PyTorch (CUDA if available), export ONNX, and record PyTorch CPU/CUDA baselines.
-- 02_inference_engines_bench.ipynb — benchmark PyTorch/ORT/OpenVINO fairly with unified preprocessing and NVML energy only on CUDA; caching avoids duplicate runs.
-- 03_flower_simulation.ipynb — placeholder; not part of the benchmarking flow yet.
-- 04_results_and_plots.ipynb — aggregate CSVs and produce plots/tables.
+- [00_check_env_and_tests.ipynb](notebooks/00_check_env_and_tests.ipynb) — validate environment, providers, and run smoke tests; writes reports/ artifacts.
+- [01_train_and_baseline.ipynb](notebooks/01_train_and_baseline.ipynb) — train on PyTorch (CUDA if available), export ONNX, and record PyTorch CPU/CUDA baselines.
+- [02_inference_engines_bench.ipynb](notebooks/02_inference_engines_bench.ipynb) — benchmark PyTorch/ORT/OpenVINO fairly with unified preprocessing and NVML energy only on CUDA; caching avoids duplicate runs.
+- [03_flower_simulation.ipynb](notebooks/03_flower_simulation.ipynb) — placeholder; not part of the benchmarking flow yet.
+- [04_results_and_plots.ipynb](notebooks/04_results_and_plots.ipynb) — aggregate CSVs and produce plots/tables.
 
 Windows setup (single venv)
 ---------------------------
@@ -28,4 +32,3 @@ Notes
 -----
 - Energy is only measured via NVML on NVIDIA GPUs in 02; CPU/iGPU/NPU are recorded as "N/D".
 - OpenVINO devices are detected at runtime; unavailable devices are skipped and noted in the CSV.
-- See ADR/0001 and reports/AUDIT_REPORT.md for architecture decisions and audit findings.
