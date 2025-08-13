@@ -11,8 +11,6 @@ import torch
 import torch.nn as nn
 from torchvision.models import mobilenet_v3_small, MobileNet_V3_Small_Weights
 
-from utils.export_utils import load_trained_model
-
 
 class MobileNetV3(nn.Module):
     """
@@ -46,31 +44,18 @@ class MobileNetV3(nn.Module):
         """
         return self.model(x)
 
-
-def load_trained_mobilenetv3(
-        path: Optional[str] = None,
-        num_classes: int = 10,
-        weights: Optional[MobileNet_V3_Small_Weights] = None,
-        map_location: str = 'cpu'
-) -> 'MobileNetV3':
-    """
-    Instantiates a MobileNetV3 model and loads trained weights from the specified path or from models_saved/mobilenetv3_cifar10.pt.
-
-    Args:
-        path (str, optional): Path to the .pt file. If None, uses default location.
-        num_classes (int): Number of output classes.
-        weights (Optional): Weights to use for base model.
-        map_location (str): Device to map the model ('cpu', 'cuda', etc).
-    Returns:
-        MobileNetV3: Model with loaded weights, set to eval mode.
-    Raises:
-        FileNotFoundError: If the weights file does not exist.
-        RuntimeError: If loading the state dict fails.
-    """
-    return load_trained_model(
-        model_class=MobileNetV3,
-        model_kwargs={'num_classes': num_classes, 'weights': weights},
-        default_filename='mobilenetv3_cifar10.pt',
-        path=path,
-        map_location=map_location
-    )
+    def to_onnx(self, sample_shape, out_path, opset: int = 17, dynamic_batch: bool = False) -> None:
+        self.eval()
+        dummy = torch.randn(*sample_shape)
+        dynamic_axes = {"input": {0: "batch"}, "logits": {0: "batch"}} if dynamic_batch else None
+        torch.onnx.export(
+            self,
+            dummy,
+            out_path,
+            export_params=True,
+            do_constant_folding=True,
+            input_names=["input"],
+            output_names=["logits"],
+            dynamic_axes=dynamic_axes,
+            opset_version=opset,
+        )

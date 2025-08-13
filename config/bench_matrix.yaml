@@ -1,0 +1,62 @@
+# Benchmark configuration matrix
+# Centralized parameters used across notebooks and utility scripts.
+
+# Global defaults
+defaults:
+  dataset: cifar10
+  image_size: 32
+  num_classes: 10
+  precision: fp32
+  batch: 64
+  warmup: 10
+  runs: 100
+  num_workers: 2
+  shuffle_test: false
+  seed: 42
+
+# Training settings used in 01_train_and_baseline.ipynb
+train:
+  epochs: 20
+  lr: 0.001
+  weight_decay: 0.0
+  early_stopping_patience: 5
+  save_best: true
+
+# Models to train and evaluate
+models:
+  - name: cnn
+    file_pt: cnn_cifar10.pt
+    file_hist: cnn_cifar10_hist.pkl
+    file_onnx: cnn_cifar10.onnx
+    input_shape: [3, 32, 32]
+  - name: mlp
+    file_pt: mlp_cifar10.pt
+    file_hist: mlp_cifar10_hist.pkl
+    file_onnx: mlp_cifar10.onnx
+    input_shape: [3, 32, 32]
+  - name: mobilenetv3
+    file_pt: mobilenetv3_cifar10.pt
+    file_hist: mobilenetv3_cifar10_hist.pkl
+    file_onnx: mobilenetv3_cifar10.onnx
+    input_shape: [3, 32, 32]
+  - name: efficientnetlite0
+    file_pt: efficientnetlite0_cifar10.pt
+    file_hist: efficientnetlite0_cifar10_hist.pkl
+    file_onnx: efficientnetlite0_cifar10.onnx
+    input_shape: [3, 32, 32]
+
+# Engines and providers for 02_inference_engines_bench.ipynb
+engines:
+  - engine: pytorch
+    providers: [cpu, cuda]
+  - engine: onnxruntime
+    providers: [cpu, cuda]
+  - engine: openvino
+    providers: [CPU, GPU, NPU]
+
+# Output files
+outputs:
+  train_csv: metrics/train_baseline.csv
+  infer_csv: metrics/engines_bench.csv
+  figures_dir: reports/figs
+  tables_dir: reports/tables

@@ -5,13 +5,9 @@ Implementation of EfficientNet-Lite0 for image classification (e.g., CIFAR-10).
 Includes model definition and utility to load trained weights.
 """
 
-from typing import Optional
-
 import torch
 import torch.nn as nn
 from torchvision.models import efficientnet_b0, EfficientNet_B0_Weights
-
-from utils.export_utils import load_trained_model
 
 
 class EfficientNetLite0(nn.Module):
@@ -45,20 +41,18 @@ class EfficientNetLite0(nn.Module):
         """
         return self.model(x)
 
-
-def load_trained_efficientnetlite0(
-        path: Optional[str] = None,
-        num_classes: int = 10,
-        pretrained: bool = False,
-        map_location: str = 'cpu'
-) -> EfficientNetLite0:
-    """
-    Instantiates an EfficientNetLite0 model and loads trained weights from the specified path or from models_saved/efficientnetlite0_cifar10.pt.
-    """
-    return load_trained_model(
-        model_class=EfficientNetLite0,
-        model_kwargs={'num_classes': num_classes, 'pretrained': pretrained},
-        default_filename='efficientnetlite0_cifar10.pt',
-        path=path,
-        map_location=map_location
-    )
+    def to_onnx(self, sample_shape, out_path, opset: int = 17, dynamic_batch: bool = False) -> None:
+        self.eval()
+        dummy = torch.randn(*sample_shape)
+        dynamic_axes = {"input": {0: "batch"}, "logits": {0: "batch"}} if dynamic_batch else None
+        torch.onnx.export(
+            self,
+            dummy,
+            out_path,
+            export_params=True,
+            do_constant_folding=True,
+            input_names=["input"],
+            output_names=["logits"],
+            dynamic_axes=dynamic_axes,
+            opset_version=opset,
+        )

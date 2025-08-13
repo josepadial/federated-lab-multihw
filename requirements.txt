@@ -31,3 +31,8 @@ ipywidgets
 
 # Type hints and code insight
 pandas-stubs
+
+# Config and energy (NVML)
+PyYAML
+nvidia-ml-py3
+pynvml

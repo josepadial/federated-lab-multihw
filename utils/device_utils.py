@@ -74,34 +74,62 @@ def get_cpu_name() -> str:
     return platform.processor() or platform.uname().processor or "Generic CPU"
 
 
+def _devices_pytorch() -> List[Dict[str, Any]]:
+    devs: List[Dict[str, Any]] = [{'name': get_cpu_name(), 'type': 'CPU', 'id': None}]
+    if torch.cuda.is_available():
+        for i in range(torch.cuda.device_count()):
+            devs.append({'name': torch.cuda.get_device_name(i), 'type': 'GPU', 'id': i})
+    return devs
+
+
+def _devices_openvino() -> List[Dict[str, Any]]:
+    try:
+        core = Core()
+        return [{'name': d, 'type': get_device_type_openvino(d), 'id': None} for d in core.available_devices]
+    except Exception:
+        logger.warning("OpenVINO not available; returning CPU only for OV backend")
+        return [{'name': 'CPU', 'type': 'CPU', 'id': None}]
+
+
+def _devices_onnx() -> List[Dict[str, Any]]:
+    # Detect ONNX Runtime providers (DirectML, CUDA, CPU)
+    try:
+        try:
+            import onnxruntime_directml as ort  # type: ignore
+        except Exception:
+            import onnxruntime as ort  # type: ignore
+        providers = set(ort.get_available_providers())
+    except Exception:
+        return [{'name': 'CPU', 'type': 'CPU', 'id': None}]
+
+    devs: List[Dict[str, Any]] = []
+    if 'DmlExecutionProvider' in providers:
+        devs.append({'name': 'DirectML', 'type': 'GPU', 'id': None})
+    if 'CUDAExecutionProvider' in providers:
+        gpu_name = None
+        if torch.cuda.is_available():
+            try:
+                gpu_name = torch.cuda.get_device_name(0)
+            except Exception:
+                gpu_name = None
+        devs.append({'name': gpu_name or 'NVIDIA CUDA', 'type': 'GPU', 'id': 0})
+    if 'CPUExecutionProvider' in providers or not providers:
+        devs.append({'name': 'CPU', 'type': 'CPU', 'id': None})
+    return devs
+
+
 def get_available_devices(backend: str = 'pytorch') -> List[Dict[str, Any]]:
     """
     Detects and returns a list of available devices for the specified backend.
-    Args:
-        backend (str): Backend to use ('pytorch', 'openvino', 'onnx').
-    Returns:
-        List[Dict]: List of device info dicts with keys: name, type, id.
     """
-    devices = []
     if backend == 'pytorch':
-
-        cpu_name = get_cpu_name()
-        devices.append({'name': cpu_name, 'type': 'CPU', 'id': None})
-        if torch.cuda.is_available():
-            for i in range(torch.cuda.device_count()):
-                devices.append({'name': torch.cuda.get_device_name(i), 'type': 'GPU', 'id': i})
-    elif backend == 'openvino':
-        try:
-
-            core = Core()
-            for dev in core.available_devices:
-                dev_type = get_device_type_openvino(dev)
-                devices.append({'name': dev, 'type': dev_type, 'id': None})
-        except ImportError:
-            logger.warning("OpenVINO is not installed.")
-    elif backend == 'onnx':
-        devices.append({'name': 'CPU', 'type': 'CPU', 'id': None})
-    return devices
+        return _devices_pytorch()
+    if backend == 'openvino':
+        return _devices_openvino()
+    if backend == 'onnx':
+        return _devices_onnx()
+    # Default to CPU only
+    return [{'name': get_cpu_name(), 'type': 'CPU', 'id': None}]
 
 
 def get_device_type_openvino(dev_name: str) -> str:
@@ -322,3 +350,25 @@ def get_dummy_input(batch_size=1, shape=(3, 32, 32), dtype='float32', seed=None)
     rng = np.random.default_rng(seed)
     arr = rng.standard_normal((batch_size, *shape))
     return arr.astype(dtype)
+
+
+def get_gpu_name_and_driver() -> tuple[str, str]:
+    """Return (gpu_name, driver_version) using nvidia-smi when available, else ("N/A","N/A")."""
+    try:
+        out = subprocess.check_output([
+            'nvidia-smi', '--query-gpu=name,driver_version', '--format=csv,noheader'
+        ], encoding='utf-8')
+        line = out.strip().split('\n')[0]
+        parts = [p.strip() for p in line.split(',')]
+        if len(parts) >= 2:
+            return parts[0], parts[1]
+    except Exception:
+        pass
+    return 'N/A', 'N/A'
+
+
+def get_os_string() -> str:
+    try:
+        return platform.platform()
+    except Exception:
+        return platform.system()

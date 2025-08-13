@@ -16,7 +16,7 @@ from torchvision import datasets, transforms
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Base folder to store data
+# Base folder to store data (project root / data)
 data_root = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
 
 # Recommended statistics for normalization
@@ -24,6 +24,7 @@ CIFAR10_MEAN = (0.4914, 0.4822, 0.4465)
 CIFAR10_STD = (0.2023, 0.1994, 0.2010)
 FASHIONMNIST_MEAN = (0.2860,)
 FASHIONMNIST_STD = (0.3530,)
+FMNIST_TEST_FILE = 'test.pt'
 
 
 def _validate_loader_args(batch_size: int, num_workers: int):
@@ -61,21 +62,42 @@ class DataLoaderFactory:
     ) -> Tuple[DataLoader, DataLoader]:
         """
         Downloads (if necessary), prepares, and returns the training and test DataLoaders for CIFAR-10.
+        Logs whether the dataset is reused from cache or downloaded.
         """
         _validate_loader_args(batch_size, num_workers)
         dir_ = data_dir or data_root
+
+        def _is_cifar10_cached(root_dir: str) -> bool:
+            # Torchvision unpacks to <root>/cifar-10-batches-py/
+            cache_dir = os.path.join(root_dir, 'cifar-10-batches-py')
+            return os.path.isdir(cache_dir) and os.path.isfile(os.path.join(cache_dir, 'data_batch_1'))
+
+        cached_before = _is_cifar10_cached(dir_)
+        if cached_before:
+            logger.info(f"Dataset CIFAR-10: using cached data at {dir_}")
+        else:
+            if download:
+                logger.info(f"Dataset CIFAR-10: downloading to {dir_} (this may take a while)")
+            else:
+                logger.warning(f"Dataset CIFAR-10: cache not found at {dir_} and download=False; loading may fail")
+
+        effective_download = bool(download and not cached_before)
         aug = [transforms.RandomCrop(32, padding=4), transforms.RandomHorizontalFlip()]
         train_tf, test_tf = _get_transforms(CIFAR10_MEAN, CIFAR10_STD, data_augmentation, aug)
         try:
             train_dataset = datasets.CIFAR10(
-                root=dir_, train=True, download=download, transform=train_tf
+                root=dir_, train=True, download=effective_download, transform=train_tf
             )
             test_dataset = datasets.CIFAR10(
-                root=dir_, train=False, download=download, transform=test_tf
+                root=dir_, train=False, download=effective_download, transform=test_tf
             )
         except Exception as e:
             logger.error(f"Failed to load CIFAR-10: {e}")
             raise
+
+        # Post-check to confirm download completed
+        if not cached_before and _is_cifar10_cached(dir_):
+            logger.info(f"Dataset CIFAR-10: download complete and cached at {dir_}")
         train_loader = DataLoader(
             train_dataset, batch_size=batch_size, shuffle=shuffle_train, num_workers=num_workers
         )
@@ -96,21 +118,41 @@ class DataLoaderFactory:
     ) -> Tuple[DataLoader, DataLoader]:
         """
         Downloads (if necessary), prepares, and returns the training and test DataLoaders for FashionMNIST.
+        Logs whether the dataset is reused from cache or downloaded.
         """
         _validate_loader_args(batch_size, num_workers)
         dir_ = data_dir or data_root
+
+        def _is_fmnist_cached(root_dir: str) -> bool:
+            proc_dir = os.path.join(root_dir, 'FashionMNIST', 'processed')
+            return os.path.isfile(os.path.join(proc_dir, 'training.pt')) and os.path.isfile(
+                os.path.join(proc_dir, FMNIST_TEST_FILE))
+
+        cached_before = _is_fmnist_cached(dir_)
+        if cached_before:
+            logger.info(f"Dataset FashionMNIST: using cached data at {dir_}")
+        else:
+            if download:
+                logger.info(f"Dataset FashionMNIST: downloading to {dir_} (this may take a while)")
+            else:
+                logger.warning(f"Dataset FashionMNIST: cache not found at {dir_} and download=False; loading may fail")
+
+        effective_download = bool(download and not cached_before)
         aug = [transforms.RandomCrop(28, padding=4), transforms.RandomHorizontalFlip(), transforms.RandomRotation(10)]
         train_tf, test_tf = _get_transforms(FASHIONMNIST_MEAN, FASHIONMNIST_STD, data_augmentation, aug)
         try:
             train_dataset = datasets.FashionMNIST(
-                root=dir_, train=True, download=download, transform=train_tf
+                root=dir_, train=True, download=effective_download, transform=train_tf
             )
             test_dataset = datasets.FashionMNIST(
-                root=dir_, train=False, download=download, transform=test_tf
+                root=dir_, train=False, download=effective_download, transform=test_tf
             )
         except Exception as e:
             logger.error(f"Failed to load FashionMNIST: {e}")
             raise
+
+        if not cached_before and _is_fmnist_cached(dir_):
+            logger.info(f"Dataset FashionMNIST: download complete and cached at {dir_}")
         train_loader = DataLoader(
             train_dataset, batch_size=batch_size, shuffle=shuffle_train, num_workers=num_workers
         )
@@ -127,18 +169,27 @@ class DataLoaderFactory:
     ) -> DataLoader:
         """
         Returns only the normalized CIFAR-10 test DataLoader.
+        Logs whether the dataset is reused from cache or downloaded.
         """
         _validate_loader_args(batch_size, num_workers)
         dir_ = data_dir or data_root
+        cache_dir = os.path.join(dir_, 'cifar-10-batches-py')
+        cached_before = os.path.isdir(cache_dir) and os.path.isfile(os.path.join(cache_dir, 'data_batch_1'))
+        if cached_before:
+            logger.info(f"Dataset CIFAR-10 (test): using cached data at {dir_}")
+        else:
+            logger.info(f"Dataset CIFAR-10 (test): downloading to {dir_} (this may take a while)")
         test_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(CIFAR10_MEAN, CIFAR10_STD)
         ])
         try:
-            testset = datasets.CIFAR10(root=dir_, train=False, download=True, transform=test_transform)
+            testset = datasets.CIFAR10(root=dir_, train=False, download=not cached_before, transform=test_transform)
         except Exception as e:
             logger.error(f"Failed to load CIFAR-10 test set: {e}")
             raise
+        if not cached_before and os.path.isdir(cache_dir) and os.path.isfile(os.path.join(cache_dir, 'test_batch')):
+            logger.info(f"Dataset CIFAR-10 (test): download complete and cached at {dir_}")
         testloader = DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         return testloader
 
@@ -150,18 +201,30 @@ class DataLoaderFactory:
     ) -> DataLoader:
         """
         Returns only the normalized FashionMNIST test DataLoader.
+        Logs whether the dataset is reused from cache or downloaded.
         """
         _validate_loader_args(batch_size, num_workers)
         dir_ = data_dir or data_root
+        proc_dir = os.path.join(dir_, 'FashionMNIST', 'processed')
+        cached_before = os.path.isfile(os.path.join(proc_dir, 'training.pt')) and os.path.isfile(
+            os.path.join(proc_dir, 'test.pt'))
+        if cached_before:
+            logger.info(f"Dataset FashionMNIST (test): using cached data at {dir_}")
+        else:
+            logger.info(f"Dataset FashionMNIST (test): downloading to {dir_} (this may take a while)")
         test_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(FASHIONMNIST_MEAN, FASHIONMNIST_STD)
         ])
         try:
-            testset = datasets.FashionMNIST(root=dir_, train=False, download=True, transform=test_transform)
+            testset = datasets.FashionMNIST(
+                root=dir_, train=False, download=not cached_before, transform=test_transform
+            )
         except Exception as e:
             logger.error(f"Failed to load FashionMNIST test set: {e}")
             raise
+        if not cached_before and os.path.isfile(os.path.join(proc_dir, FMNIST_TEST_FILE)):
+            logger.info(f"Dataset FashionMNIST (test): download complete and cached at {dir_}")
         testloader = DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
         return testloader
 
