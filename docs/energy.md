@@ -3,6 +3,7 @@
 Method
 - NVIDIA GPUs only via NVML (nvidia-ml-py3), measured around isolated inference calls.
 - Per-run measurement returns energy in Joules and time elapsed; aggregated across runs where needed.
+ - In Notebook 03 (Flower), optional NVML sampling can be enabled for CUDA clients during local evaluation/training windows; non-CUDA clients report N/D.
 
 Limitations
 - No CPU/iGPU RAPL on Windows; those entries are N/D.

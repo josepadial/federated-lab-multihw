@@ -9,6 +9,7 @@ Design principles
 Data handling
 - CIFAR-10 test set loaded consistently; preprocessing normalized to NCHW float32 with dataset stats.
 - Shared preprocess_np() used by all engines to ensure fairness.
+ - For 03, local client datasets are drawn from the same CIFAR-10 base with simple IID splits unless otherwise specified in the notebook.
 
 Benchmarking protocol
 - Warmup and run counts fixed by config; identical batch used across engines for a given benchmark.
@@ -19,5 +20,6 @@ Benchmarking protocol
 Traceability
 - Model hashes (SHA-256) recorded; driver/runtime versions captured with OS info.
 - Providers availability stored in reports/providers_status.csv; environment report saved from 00.
+ - Federated rounds logged in metrics/03_flower_rounds.csv with scenario, role, device, times, accuracy, bytes, and optional energy.
 
 Next: [Benchmarks](./benchmarks.md)

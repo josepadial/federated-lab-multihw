@@ -12,12 +12,14 @@ Environment setup (single venv)
 2) Install PyTorch and torchvision appropriate for your CUDA or CPU-only.
 3) Install ONNX Runtime (GPU build provides CPU and CUDA).
 4) Install OpenVINO runtime.
-5) Optional: nvidia-ml-py3 for NVML energy measurement.
+5) Install Flower (`flwr[simulation]`) for Notebook 03.
+6) Optional: nvidia-ml-py3 for NVML energy measurement.
 
 Notebook workflow
 - 00: Validate providers, generate reports/providers_status.csv and a tiny consistency check.
 - 01: Train selected models (CNN, MLP, MobileNetV3, EfficientNet-Lite0) and export ONNX.
-- 02: Benchmark inference across engines/providers; metrics go to metrics/infer_metrics.csv.
+- 02: Benchmark inference across engines/providers; metrics go to metrics/engines_bench.csv and metrics/inference_energy_summary.csv.
+- 03: Run Flower simulation; metrics go to metrics/03_flower_rounds.csv.
 - 04: Produce plots and tables from the CSVs under reports/.
 
 Tips
